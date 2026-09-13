@@ -26,7 +26,7 @@ export default function BuyBox() {
       const res = await fetch("/api/frete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cep }),
+        body: JSON.stringify({ cep, quantity }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não foi possível calcular o frete.");
