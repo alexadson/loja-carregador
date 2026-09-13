@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { product } from "@/lib/product";
 import { calculateFreight, isValidCep, FreightError } from "@/lib/melhorEnvio";
+import { sumBRL } from "@/lib/currency";
 
 export async function POST(req: NextRequest) {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
@@ -50,6 +51,11 @@ export async function POST(req: NextRequest) {
 
   const origin = req.nextUrl.origin;
   const isPubliclyReachable = origin.startsWith("https://");
+  const total = sumBRL(product.price * quantity, freight.price);
+
+  const successUrl = new URL("/sucesso", origin);
+  successUrl.searchParams.set("value", total.toFixed(2));
+  successUrl.searchParams.set("quantity", String(quantity));
 
   const preference: Record<string, unknown> = {
     items: [
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
       },
     ],
     back_urls: {
-      success: `${origin}/sucesso`,
+      success: successUrl.toString(),
       failure: `${origin}/#comprar`,
       pending: `${origin}/#comprar`,
     },
@@ -94,5 +100,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: data }, { status: response.status });
   }
 
-  return NextResponse.json({ init_point: data.init_point });
+  return NextResponse.json({ init_point: data.init_point, total, quantity });
 }

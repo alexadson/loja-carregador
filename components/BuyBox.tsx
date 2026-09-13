@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Minus, Plus, Loader2, Truck, CheckCircle2 } from "lucide-react";
 import { product } from "@/lib/product";
 import { formatBRL, sumBRL } from "@/lib/currency";
+import { trackInitiateCheckout } from "@/lib/analytics";
 
 type FreteOption = { name: string; price: number; days: number };
 
@@ -92,6 +93,7 @@ export default function BuyBox() {
           data.error?.message || data.error || "Não foi possível iniciar o pagamento."
         );
       }
+      trackInitiateCheckout({ value: data.total, quantity: data.quantity });
       window.location.href = data.init_point;
     } catch (e) {
       setCheckoutError(e instanceof Error ? e.message : "Erro ao iniciar o checkout.");
