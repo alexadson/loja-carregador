@@ -16,8 +16,9 @@ export async function POST(req: NextRequest) {
 
   const { quantity = 1 } = await req.json();
   const origin = req.nextUrl.origin;
+  const isPubliclyReachable = origin.startsWith("https://");
 
-  const preference = {
+  const preference: Record<string, unknown> = {
     items: [
       {
         title: product.fullName,
@@ -31,8 +32,13 @@ export async function POST(req: NextRequest) {
       failure: `${origin}/#comprar`,
       pending: `${origin}/#comprar`,
     },
-    auto_return: "approved",
   };
+
+  // O Mercado Pago só aceita auto_return com uma URL pública (https).
+  // Em desenvolvimento local (http://localhost) isso é omitido.
+  if (isPubliclyReachable) {
+    preference.auto_return = "approved";
+  }
 
   const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
     method: "POST",
