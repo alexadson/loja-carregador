@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ShieldCheck, Truck, BadgePercent, Star } from "lucide-react";
 import { product } from "@/lib/product";
+import { formatBRL } from "@/lib/currency";
 
 export default function Hero() {
   return (
@@ -24,14 +25,14 @@ export default function Hero() {
 
           <div className="mt-7 flex items-baseline gap-3">
             <span className="text-3xl font-extrabold text-neutral-900">
-              R$ {product.price.toFixed(2).replace(".", ",")}
+              {formatBRL(product.price)}
             </span>
             <span className="text-base text-neutral-400 line-through">
-              R$ {product.compareAtPrice.toFixed(2).replace(".", ",")}
+              {formatBRL(product.compareAtPrice)}
             </span>
           </div>
           <p className="text-sm text-neutral-500">
-            ou 3x de R$ {product.installments.value.toFixed(2).replace(".", ",")} sem juros
+            ou 3x de {formatBRL(product.installments.value)} sem juros
           </p>
 
           <div className="mt-7 flex flex-col sm:flex-row gap-3">

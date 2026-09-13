@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Minus, Plus, Loader2, Truck } from "lucide-react";
+import { Minus, Plus, Loader2, Truck, CheckCircle2 } from "lucide-react";
 import { product } from "@/lib/product";
+import { formatBRL, sumBRL } from "@/lib/currency";
 
 type FreteOption = { name: string; price: number; days: number };
 
@@ -11,16 +12,41 @@ export default function BuyBox() {
   const [quantity, setQuantity] = useState(1);
   const [cep, setCep] = useState("");
   const [frete, setFrete] = useState<FreteOption[] | null>(null);
+  const [selectedFrete, setSelectedFrete] = useState<FreteOption | null>(null);
   const [freteLoading, setFreteLoading] = useState(false);
   const [freteError, setFreteError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const total = product.price * quantity;
+  const subtotal = sumBRL(product.price * quantity);
+  const total = selectedFrete ? sumBRL(subtotal, selectedFrete.price) : null;
+
+  // Sempre que a quantidade ou o CEP mudam depois de um frete já calculado,
+  // o valor anterior fica desatualizado (o peso total muda com a
+  // quantidade). Zera a seleção para forçar um novo cálculo antes de
+  // liberar a compra novamente.
+  function invalidateFrete() {
+    setFrete(null);
+    setSelectedFrete(null);
+    setFreteError(null);
+    setCheckoutError(null);
+  }
+
+  function handleQuantityChange(next: number) {
+    setQuantity(next);
+    invalidateFrete();
+  }
+
+  function handleCepChange(value: string) {
+    setCep(value);
+    invalidateFrete();
+  }
 
   async function calcularFrete() {
     setFreteError(null);
+    setCheckoutError(null);
     setFrete(null);
+    setSelectedFrete(null);
     setFreteLoading(true);
     try {
       const res = await fetch("/api/frete", {
@@ -31,6 +57,7 @@ export default function BuyBox() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não foi possível calcular o frete.");
       setFrete(data.options);
+      setSelectedFrete(data.options[0] ?? null);
     } catch (e) {
       setFreteError(e instanceof Error ? e.message : "Erro ao calcular o frete.");
     } finally {
@@ -40,15 +67,31 @@ export default function BuyBox() {
 
   async function finalizarCompra() {
     setCheckoutError(null);
+
+    if (!selectedFrete) {
+      setCheckoutError(
+        "Calcule o frete e escolha uma opção de entrega antes de finalizar a compra."
+      );
+      return;
+    }
+
     setCheckoutLoading(true);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity }),
+        body: JSON.stringify({
+          quantity,
+          cep,
+          freightName: selectedFrete.name,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || data.error || "Não foi possível iniciar o pagamento.");
+      if (!res.ok) {
+        throw new Error(
+          data.error?.message || data.error || "Não foi possível iniciar o pagamento."
+        );
+      }
       window.location.href = data.init_point;
     } catch (e) {
       setCheckoutError(e instanceof Error ? e.message : "Erro ao iniciar o checkout.");
@@ -75,21 +118,21 @@ export default function BuyBox() {
 
           <div className="mt-3 flex items-baseline gap-3">
             <span className="text-3xl font-extrabold text-neutral-900">
-              R$ {product.price.toFixed(2).replace(".", ",")}
+              {formatBRL(product.price)}
             </span>
             <span className="text-base text-neutral-400 line-through">
-              R$ {product.compareAtPrice.toFixed(2).replace(".", ",")}
+              {formatBRL(product.compareAtPrice)}
             </span>
           </div>
           <p className="text-sm text-neutral-500">
-            ou 3x de R$ {product.installments.value.toFixed(2).replace(".", ",")} sem juros
+            ou 3x de {formatBRL(product.installments.value)} sem juros
           </p>
 
           <div className="mt-6 flex items-center gap-4">
             <span className="text-sm font-medium text-neutral-700">Quantidade</span>
             <div className="flex items-center rounded-full border border-neutral-300">
               <button
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                onClick={() => handleQuantityChange(Math.max(1, quantity - 1))}
                 className="p-2.5 text-neutral-600 hover:text-neutral-900"
                 aria-label="Diminuir quantidade"
               >
@@ -97,7 +140,7 @@ export default function BuyBox() {
               </button>
               <span className="w-8 text-center font-semibold">{quantity}</span>
               <button
-                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                onClick={() => handleQuantityChange(Math.min(10, quantity + 1))}
                 className="p-2.5 text-neutral-600 hover:text-neutral-900"
                 aria-label="Aumentar quantidade"
               >
@@ -113,7 +156,7 @@ export default function BuyBox() {
             <div className="mt-2 flex gap-2">
               <input
                 value={cep}
-                onChange={(e) => setCep(e.target.value)}
+                onChange={(e) => handleCepChange(e.target.value)}
                 placeholder="Seu CEP"
                 inputMode="numeric"
                 maxLength={9}
@@ -127,26 +170,60 @@ export default function BuyBox() {
                 {freteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Calcular"}
               </button>
             </div>
+
             {freteError && <p className="mt-2 text-sm text-red-600">{freteError}</p>}
+
             {frete && (
-              <ul className="mt-3 space-y-1.5 text-sm">
-                {frete.map((opt) => (
-                  <li key={opt.name} className="flex justify-between rounded-lg bg-neutral-50 px-3 py-2">
-                    <span>
-                      {opt.name} · até {opt.days} dias úteis
-                    </span>
-                    <span className="font-semibold">R$ {opt.price.toFixed(2).replace(".", ",")}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-3 space-y-2">
+                {frete.map((opt) => {
+                  const isSelected = selectedFrete?.name === opt.name;
+                  return (
+                    <button
+                      key={opt.name}
+                      onClick={() => setSelectedFrete(opt)}
+                      className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm text-left transition-colors ${
+                        isSelected
+                          ? "border-brand bg-green-50"
+                          : "border-neutral-200 hover:border-neutral-300"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {isSelected ? (
+                          <CheckCircle2 className="h-4 w-4 text-brand shrink-0" />
+                        ) : (
+                          <span className="h-4 w-4 rounded-full border border-neutral-300 shrink-0" />
+                        )}
+                        {opt.name} · até {opt.days} dias úteis
+                      </span>
+                      <span className="font-semibold">{formatBRL(opt.price)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {!frete && !freteError && (
+              <p className="mt-2 text-xs text-neutral-400">
+                Informe o CEP e calcule o frete para ver o valor total do pedido.
+              </p>
             )}
           </div>
 
-          <div className="mt-8 border-t border-neutral-100 pt-6 flex items-center justify-between">
-            <span className="text-neutral-600 font-medium">Total</span>
-            <span className="text-2xl font-extrabold text-neutral-900">
-              R$ {total.toFixed(2).replace(".", ",")}
-            </span>
+          <div className="mt-8 border-t border-neutral-100 pt-6 space-y-1.5">
+            <div className="flex items-center justify-between text-sm text-neutral-600">
+              <span>Subtotal ({quantity}x)</span>
+              <span>{formatBRL(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-neutral-600">
+              <span>Frete</span>
+              <span>{selectedFrete ? formatBRL(selectedFrete.price) : "a calcular"}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1.5">
+              <span className="text-neutral-600 font-medium">Total</span>
+              <span className="text-2xl font-extrabold text-neutral-900">
+                {total ? formatBRL(total) : "—"}
+              </span>
+            </div>
           </div>
 
           <button
