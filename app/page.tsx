@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import TrustBar from "@/components/TrustBar";
+import VideoShowcase from "@/components/VideoShowcase";
 import Benefits from "@/components/Benefits";
 import HowItWorks from "@/components/HowItWorks";
 import Guarantee from "@/components/Guarantee";
@@ -15,6 +16,7 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
         <TrustBar />
+        <VideoShowcase />
         <Benefits />
         <HowItWorks />
         <Guarantee />
