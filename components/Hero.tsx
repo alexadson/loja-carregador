@@ -1,7 +1,8 @@
-import Image from "next/image";
 import { ShieldCheck, Truck, BadgePercent, Star } from "lucide-react";
 import { product } from "@/lib/product";
 import { formatBRL } from "@/lib/currency";
+
+const STREAMABLE_VIDEO_ID = "3gch73";
 
 export default function Hero() {
   return (
@@ -66,16 +67,17 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative mx-auto w-full max-w-sm">
           <div className="absolute inset-0 -z-10 bg-gradient-to-tr from-green-100 via-white to-white rounded-[2.5rem]" />
-          <Image
-            src={product.images.hero}
-            alt="TrioCharge — carregador wireless 3 em 1"
-            width={1200}
-            height={1200}
-            priority
-            className="w-full h-auto max-w-md mx-auto drop-shadow-xl"
-          />
+          <div className="relative w-full overflow-hidden rounded-3xl shadow-xl aspect-[4/5] bg-black">
+            <iframe
+              src={`https://streamable.com/e/${STREAMABLE_VIDEO_ID}?autoplay=1&muted=1&loop=1`}
+              title="TrioCharge — carregador wireless 3 em 1 em ação"
+              className="absolute inset-0 h-full w-full"
+              allow="fullscreen; autoplay"
+              allowFullScreen
+            />
+          </div>
         </div>
       </div>
     </section>
