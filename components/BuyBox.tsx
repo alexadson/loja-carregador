@@ -2,22 +2,26 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Minus, Plus, Loader2, Truck, CheckCircle2 } from "lucide-react";
+import { Minus, Plus, Loader2, Truck, CheckCircle2, Mail } from "lucide-react";
 import { product } from "@/lib/product";
 import { formatBRL, sumBRL } from "@/lib/currency";
 import { trackInitiateCheckout } from "@/lib/analytics";
+import { isValidEmail } from "@/lib/order";
+import PixPayment from "@/components/PixPayment";
 
 type FreteOption = { name: string; price: number; days: number };
 
 export default function BuyBox() {
   const [quantity, setQuantity] = useState(1);
   const [cep, setCep] = useState("");
+  const [email, setEmail] = useState("");
   const [frete, setFrete] = useState<FreteOption[] | null>(null);
   const [selectedFrete, setSelectedFrete] = useState<FreteOption | null>(null);
   const [freteLoading, setFreteLoading] = useState(false);
   const [freteError, setFreteError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [showPix, setShowPix] = useState(false);
 
   const subtotal = sumBRL(product.price * quantity);
   const total = selectedFrete ? sumBRL(subtotal, selectedFrete.price) : null;
@@ -31,6 +35,7 @@ export default function BuyBox() {
     setSelectedFrete(null);
     setFreteError(null);
     setCheckoutError(null);
+    setShowPix(false);
   }
 
   function handleQuantityChange(next: number) {
@@ -48,6 +53,7 @@ export default function BuyBox() {
     setCheckoutError(null);
     setFrete(null);
     setSelectedFrete(null);
+    setShowPix(false);
     setFreteLoading(true);
     try {
       const res = await fetch("/api/frete", {
@@ -66,7 +72,23 @@ export default function BuyBox() {
     }
   }
 
-  async function finalizarCompra() {
+  function handlePagarComPix() {
+    setCheckoutError(null);
+
+    if (!selectedFrete) {
+      setCheckoutError(
+        "Calcule o frete e escolha uma opção de entrega antes de finalizar a compra."
+      );
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setCheckoutError("Informe um e-mail válido para gerar o Pix.");
+      return;
+    }
+    setShowPix(true);
+  }
+
+  async function finalizarCompraCartao() {
     setCheckoutError(null);
 
     if (!selectedFrete) {
@@ -211,6 +233,22 @@ export default function BuyBox() {
             )}
           </div>
 
+          <div className="mt-6">
+            <label className="text-sm font-medium text-neutral-700 flex items-center gap-1.5">
+              <Mail className="h-4 w-4" /> Seu e-mail
+            </label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="voce@email.com"
+              className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+            <p className="mt-1 text-xs text-neutral-400">
+              Usado para confirmar seu pedido e gerar o Pix.
+            </p>
+          </div>
+
           <div className="mt-8 border-t border-neutral-100 pt-6 space-y-1.5">
             <div className="flex items-center justify-between text-sm text-neutral-600">
               <span>Subtotal ({quantity}x)</span>
@@ -228,15 +266,34 @@ export default function BuyBox() {
             </div>
           </div>
 
-          <button
-            onClick={finalizarCompra}
-            disabled={checkoutLoading}
-            className="mt-4 w-full inline-flex justify-center items-center gap-2 rounded-full bg-brand px-8 py-4 text-base font-bold text-white shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors disabled:opacity-60"
-          >
-            {checkoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Finalizar compra
-          </button>
-          {checkoutError && <p className="mt-3 text-sm text-red-600">{checkoutError}</p>}
+          {showPix && selectedFrete ? (
+            <PixPayment
+              email={email}
+              quantity={quantity}
+              cep={cep}
+              freightName={selectedFrete.name}
+              onBack={() => setShowPix(false)}
+            />
+          ) : (
+            <>
+              <button
+                onClick={handlePagarComPix}
+                className="mt-4 w-full inline-flex justify-center items-center gap-2 rounded-full bg-brand px-8 py-4 text-base font-bold text-white shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors"
+              >
+                Pagar com Pix
+              </button>
+              <button
+                onClick={finalizarCompraCartao}
+                disabled={checkoutLoading}
+                className="mt-3 w-full inline-flex justify-center items-center gap-2 rounded-full border border-neutral-300 px-8 py-3.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-60"
+              >
+                {checkoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Pagar com cartão ou boleto
+              </button>
+              {checkoutError && <p className="mt-3 text-sm text-red-600">{checkoutError}</p>}
+            </>
+          )}
+
           <p className="mt-3 text-center text-xs text-neutral-400">
             Pagamento processado com segurança pelo Mercado Pago
           </p>
